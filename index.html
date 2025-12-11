@@ -686,7 +686,9 @@
         function checkPassword() {
             const pass = document.getElementById('exam-password').value;
             const inputField = document.getElementById('exam-password');
-            if(pass === "Ruhvaan") {
+            if(pass === "Ruhvaan") {         var el = document.documentElement;
+        if(el.requestFullscreen) el.requestFullscreen();
+        else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('test-interface').style.display = 'block';
                 startExam();
