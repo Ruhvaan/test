@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>JEE Catalyst CBT - Secure Login</title>
     
     <!-- MathJax for Math Formulas -->
@@ -683,16 +683,38 @@
         let timerInterval;
 
         // --- PASSWORD FUNCTION ---
+                // --- SECURITY VARIABLES ---
+        let warningCount = 0;
+        const MAX_WARNINGS = 3;
+
+        // --- PASSWORD & SECURITY FUNCTION ---
         function checkPassword() {
             const pass = document.getElementById('exam-password').value;
             const inputField = document.getElementById('exam-password');
-            if(pass === "Ruhvaan") {         var el = document.documentElement;
-        if(el.requestFullscreen) el.requestFullscreen();
-        else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            
+            // Password Check (Direct check)
+            if(pass === "Ruhvaan") {
+                
+                // 1. Full Screen Logic (Mobile + Laptop Compatible)
+                var elem = document.documentElement;
+                try {
+                    if (elem.requestFullscreen) elem.requestFullscreen();
+                    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari
+                    else if (elem.msRequestFullscreen) elem.msRequestFullscreen(); // IE/Edge
+                } catch(err) {
+                    console.log("Full screen request denied or blocked.");
+                }
+
+                // 2. Hide Login, Show Exam
                 document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('test-interface').style.display = 'block';
+                document.getElementById('test-interface').style.display = 'block'; 
+                
+                // 3. Start Exam & Enable Security
                 startExam();
+                enableSecurity(); 
+
             } else {
+                // Wrong Password Effect
                 inputField.classList.add('error');
                 inputField.value = '';
                 inputField.placeholder = "Access Denied!";
@@ -700,6 +722,39 @@
                     inputField.classList.remove('error');
                     inputField.placeholder = "Enter Password";
                 }, 1000);
+            }
+        }
+
+        // --- SECURITY LOGIC ---
+        function enableSecurity() {
+            // A. Prevent Back Button
+            history.pushState(null, null, location.href);
+            window.onpopstate = function () {
+                history.go(1);
+                handleViolation("Back Button Press Detected!");
+            };
+
+            // B. Detect Tab Switching / Minimizing
+            document.addEventListener("visibilitychange", function() {
+                if (document.hidden) {
+                    handleViolation("Tab Switching / App Minimize Detected!");
+                }
+            });
+
+            // C. Prevent Right Click (Disable Context Menu)
+            document.addEventListener('contextmenu', event => event.preventDefault());
+        }
+
+        function handleViolation(reason) {
+            // Agar exam khatam ho chuka hai (submit ho gaya), toh warning na de
+            if(document.getElementById('test-interface').style.display === 'none') return;
+
+            warningCount++;
+            alert(`⚠️ WARNING ${warningCount}/${MAX_WARNINGS}\n\nReason: ${reason}\n\nPlease stay on the exam screen.\nTest will AUTO-SUBMIT after 3 warnings.`);
+
+            if(warningCount >= MAX_WARNINGS) {
+                // Submit function call (Force submit)
+                endTestAndShowAnswers(true); 
             }
         }
 
