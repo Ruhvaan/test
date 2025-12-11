@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEE Catalyst CBT - Secure Login</title>
+    
+    <!-- MathJax for Math Formulas -->
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                displayMath: [['$$','$$'], ['\\[','\\]']],
+                processEscapes: true
+            }
+        });
+    </script>
+    <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* Base Styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* --- LOGIN SCREEN STYLES --- */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .login-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            width: 350px;
+        }
+
+        .login-title {
+            color: #fff; font-family: 'Cinzel', serif; font-size: 1.8em; margin-bottom: 30px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .password-input {
+            width: 100%; padding: 15px; margin-bottom: 20px;
+            border-radius: 30px; border: none; outline: none;
+            background: rgba(255,255,255,0.9);
+            font-size: 1em; text-align: center;
+            transition: 0.3s;
+        }
+        .password-input:focus { box-shadow: 0 0 15px rgba(0, 188, 212, 0.5); }
+        .password-input.error { border: 2px solid #ff4444; animation: shake 0.3s; }
+
+        .login-btn {
+            width: 100%; padding: 12px;
+            border-radius: 30px; border: none;
+            background: linear-gradient(90deg, #00bcd4, #0097a7);
+            color: white; font-weight: bold; font-size: 1.1em;
+            cursor: pointer; transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 188, 212, 0.4);
+        }
+        .login-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 188, 212, 0.6); }
+
+        @keyframes shake {
+            0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 
+            50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); }
+        }
+
+        /* --- TEST INTERFACE (Hidden Initially) --- */
+        #test-interface { display: none; }
+
+        /* Header */
+        .header-bar {
+            position: fixed; top: 0; left: 0; width: 100%;
+            display: flex; justify-content: space-between; align-items: center;
+            background: linear-gradient(90deg, #1a237e, #283593);
+            color: white; padding: 15px 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 1000;
+        }
+        .header-title { font-size: 1.4em; font-weight: 600; letter-spacing: 1px; }
+        #timer {
+            font-size: 1.5em; font-weight: 700; color: #ffd700;
+            background: rgba(0,0,0,0.3); border: 2px solid #ffd700;
+            padding: 5px 20px; border-radius: 30px;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        /* Layout */
+        .main-container {
+            display: flex; padding-top: 80px; max-width: 100%;
+            height: 100vh; overflow: hidden;
+        }
+
+        /* Left Panel - Questions */
+        .question-panel {
+            flex: 3; padding: 30px; overflow-y: auto;
+            background: #fff; border-right: 1px solid #ddd;
+        }
+
+        .question-header-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;
+        }
+
+        .q-label { font-size: 1.2em; font-weight: 700; color: #1a237e; }
+
+        /* MARK FOR REVIEW CHECKBOX STYLE */
+        .review-toggle {
+            display: flex; align-items: center; cursor: pointer;
+            font-size: 0.95em; font-weight: 600; color: #ff9800;
+            background: #fff8e1; padding: 8px 15px; border-radius: 20px;
+            border: 1px solid #ffe0b2; transition: all 0.3s;
+        }
+        .review-toggle:hover { background: #ffecb3; }
+        .review-toggle input { margin-right: 8px; transform: scale(1.3); accent-color: #ff9800; cursor: pointer; }
+
+        .question-page { display: none; /* Controlled by JS */ }
+
+        .question-text {
+            font-size: 1.3em; font-weight: 500; margin-bottom: 25px;
+            color: #2c3e50; line-height: 1.6;
+        }
+
+        /* Options */
+        .options-list { list-style: none; padding: 0; }
+        .options-list label {
+            display: flex; align-items: center;
+            background: #f8f9fa; margin-bottom: 12px; padding: 15px 20px;
+            border-radius: 10px; cursor: pointer; border: 2px solid #e9ecef;
+            transition: all 0.2s; font-size: 1.1em;
+        }
+        .options-list label:hover { border-color: #1a237e; background: #e8eaf6; }
+        .options-list input[type="radio"] {
+            margin-right: 15px; transform: scale(1.5); accent-color: #1a237e;
+        }
+
+        /* Navigation Buttons */
+        .navigation-controls {
+            display: flex; gap: 10px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;
+        }
+        .nav-btn {
+            padding: 12px 24px; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; color: white;
+            transition: transform 0.2s; flex: 1;
+        }
+        .nav-btn:active { transform: scale(0.98); }
+        .save-next-btn { background: #2e7d32; } /* Green */
+        .save-next-btn:hover { background: #1b5e20; }
+        .mark-review-btn { background: #f57c00; } /* Orange */
+        .mark-review-btn:hover { background: #e65100; }
+        .clear-btn { background: #c62828; } /* Red */
+        .clear-btn:hover { background: #b71c1c; }
+        .next-btn { background: #1565c0; } /* Blue */
+        .next-btn:hover { background: #0d47a1; }
+
+        /* Right Panel - Palette */
+        .palette-panel {
+            flex: 1; min-width: 300px; max-width: 350px;
+            background: #f8f9fa; padding: 20px;
+            display: flex; flex-direction: column;
+            border-left: 1px solid #ccc;
+            height: calc(100vh - 80px); /* Full height minus header */
+            position: relative;
+        }
+        
+        /* Palette Grid - Scrollable area */
+        .palette-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .palette-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+            margin-bottom: 20px; 
+        }
+        .q-status {
+            width: 40px; height: 40px; display: flex; justify-content: center; align-items: center;
+            border-radius: 8px; font-weight: bold; cursor: pointer; color: white;
+            font-size: 0.9em; border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        /* Status Colors */
+        .status-0 { background: #e53935; } /* Not Answered (Red) */
+        .status-1 { background: #43a047; } /* Answered (Green) */
+        .status-2 { background: #fb8c00; border: 2px solid #1a237e; } /* Marked for Review (Orange) */
+        .status-3 { background: #1e88e5; } /* Visited (Blue) */
+        .status-4 { background: #bdbdbd; } /* Not Visited (Gray) */
+
+        .legend { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .legend p { font-size: 0.85em; margin: 5px 0; display: flex; align-items: center; font-weight: 600; }
+        .legend span { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border-radius: 50%; }
+
+        /* Fixed Bottom Section in Palette */
+        .palette-footer {
+            margin-top: auto;
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+        }
+
+        .submit-btn {
+            width: 100%; padding: 15px; background: #00bcd4; color: white;
+            border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold;
+            cursor: pointer; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); }
+        }
+        .submit-btn:hover { background: #0097a7; }
+
+        /* --- PREMIUM CREATOR BADGE --- */
+        .premium-badge {
+            margin-top: 15px;
+            padding: 10px;
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            border: 2px solid #d4af37; /* Gold Border */
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(212, 175, 55, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .premium-text {
+            font-family: 'Cinzel', serif;
+            font-size: 0.8em;
+            background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .premium-sub {
+            font-family: 'Poppins', sans-serif;
+            color: #d4af37; font-size: 0.7em; margin-top: 2px;
+        }
+
+        /* --- SCORECARD STYLES --- */
+        .answer-key-container { display: none; padding: 40px; background: #fff; max-width: 1200px; margin: 0 auto; }
+        
+        .score-card {
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(26, 35, 126, 0.3);
+            text-align: center;
+        }
+        .score-title { font-size: 2em; font-weight: 700; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        .score-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .score-val { font-size: 2.5em; font-weight: 800; }
+        .score-lbl { font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+        .score-total { color: #ffd700; }
+        .score-correct { color: #4caf50; }
+        .score-wrong { color: #f44336; }
+
+        .ans-card { border-bottom: 1px solid #eee; padding: 20px 0; }
+        .ans-correct { color: #2e7d32; font-weight: bold; margin-top: 10px; }
+        .ans-reason { background: #fff3e0; padding: 10px; border-left: 4px solid #ff9800; margin-top: 10px; }
+        .user-ans-display { font-weight: 600; color: #555; margin-top: 5px; }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; height: auto; overflow: visible; }
+            .question-panel { height: auto; }
+            .palette-panel { height: auto; border-left: none; border-top: 1px solid #ccc; }
+            .score-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PASSWORD LOGIN SCREEN -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <div class="login-title">SECURE EXAM</div>
+            <input type="password" id="exam-password" class="password-input" placeholder="Enter Password">
+            <button class="login-btn" onclick="checkPassword()">START EXAM</button>
+        </div>
+    </div>
+
+    <!-- MAIN EXAM CONTENT (HIDDEN INITIALLY) -->
+    <div id="test-interface">
+        
+        <!-- Header -->
+        <div class="header-bar">
+            <div class="header-title">JEE CATALYST CBT</div>
+            <div id="timer">45:00</div>
+        </div>
+
+        <div class="main-container">
+            
+            <!-- Left: Question Area -->
+            <div class="question-panel" id="question-panel-div">
+                
+                <!-- Dynamic Questions Injected Here -->
+                <!-- Q1 -->
+                <div class="question-page" id="q_1">
+                    <div class="question-header-row">
+                        <span class="q-label">Question 1</span>
+                        <label class="review-toggle">
+                            <input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review
+                        </label>
+                    </div>
+                    <div class="question-text">The remainder when $((64)^{64})^{64}$ is divided by $7$ is equal to</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_1_answer" value="A"> (A) 4</label></li>
+                        <li><label><input type="radio" name="q_1_answer" value="B"> (B) 1</label></li>
+                        <li><label><input type="radio" name="q_1_answer" value="C"> (C) 3</label></li>
+                        <li><label><input type="radio" name="q_1_answer" value="D"> (D) 6</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q2 -->
+                <div class="question-page" id="q_2">
+                    <div class="question-header-row">
+                        <span class="q-label">Question 2</span>
+                        <label class="review-toggle">
+                            <input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review
+                        </label>
+                    </div>
+                    <div class="question-text">If $a_{n}=\sum_{r=0}^{n}\frac{1}{{}^nC_{r}},$ then $\sum_{r=0}^{n}\frac{r}{{}^nC_{r}}$ equals</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_2_answer" value="A"> (A) $(n-1)a_{n}$</label></li>
+                        <li><label><input type="radio" name="q_2_answer" value="B"> (B) $na_{n}$</label></li>
+                        <li><label><input type="radio" name="q_2_answer" value="C"> (C) $\frac{n}{2}a_{n}$</label></li>
+                        <li><label><input type="radio" name="q_2_answer" value="D"> (D) none of these</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q3 -->
+                <div class="question-page" id="q_3">
+                    <div class="question-header-row">
+                        <span class="q-label">Question 3</span>
+                        <label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label>
+                    </div>
+                    <div class="question-text">Coefficient of $x^{11}$ in the expansion of $(1+x^{2})^{4}(1+x^{3})^{7}(1+x^{4})^{12}$ is</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_3_answer" value="A"> (A) 1051</label></li>
+                        <li><label><input type="radio" name="q_3_answer" value="B"> (B) 1106</label></li>
+                        <li><label><input type="radio" name="q_3_answer" value="C"> (C) 1113</label></li>
+                        <li><label><input type="radio" name="q_3_answer" value="D"> (D) 1120</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q4 -->
+                <div class="question-page" id="q_4">
+                    <div class="question-header-row">
+                        <span class="q-label">Question 4</span>
+                        <label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label>
+                    </div>
+                    <div class="question-text">Sum of rational terms in expansion $(1+2^{\frac{1}{3}}+3^{\frac{1}{2}})^{6}$ is</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_4_answer" value="A"> (A) 612</label></li>
+                        <li><label><input type="radio" name="q_4_answer" value="B"> (B) 215</label></li>
+                        <li><label><input type="radio" name="q_4_answer" value="C"> (C) 156</label></li>
+                        <li><label><input type="radio" name="q_4_answer" value="D"> (D) 160</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q5 -->
+                <div class="question-page" id="q_5">
+                    <div class="question-header-row">
+                        <span class="q-label">Question 5</span>
+                        <label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label>
+                    </div>
+                    <div class="question-text">If the sum $\sum_{r=1}^{30}\frac{r^{2} ({}^{30}C_{r})^{2}}{{}^{30}C_{r-1}}=\alpha\cdot2^{29},$ then $\alpha=$</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_5_answer" value="A"> (A) 225</label></li>
+                        <li><label><input type="radio" name="q_5_answer" value="B"> (B) 465</label></li>
+                        <li><label><input type="radio" name="q_5_answer" value="C"> (C) 345</label></li>
+                        <li><label><input type="radio" name="q_5_answer" value="D"> (D) 425</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q6 -->
+                <div class="question-page" id="q_6">
+                    <div class="question-header-row"><span class="q-label">Question 6</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">The last two digits of the number $3^{400}$ are</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_6_answer" value="A"> (A) 10</label></li><li><label><input type="radio" name="q_6_answer" value="B"> (B) 01</label></li><li><label><input type="radio" name="q_6_answer" value="C"> (C) 30</label></li><li><label><input type="radio" name="q_6_answer" value="D"> (D) 03</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q7 -->
+                <div class="question-page" id="q_7">
+                    <div class="question-header-row"><span class="q-label">Question 7</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Let $(5+2\sqrt{6})^{n}=p+f$ where $n\in N$ and $p\in N$, $0&lt;f&lt;1$ then the value of $f^{2}-f+pf-p$ is</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_7_answer" value="A"> (A) A natural number</label></li><li><label><input type="radio" name="q_7_answer" value="B"> (B) A negative number</label></li><li><label><input type="radio" name="q_7_answer" value="C"> (C) A prime number</label></li><li><label><input type="radio" name="q_7_answer" value="D"> (D) An irrational number</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q8 -->
+                <div class="question-page" id="q_8">
+                    <div class="question-header-row"><span class="q-label">Question 8</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Let $m$ and $n$ be the coefficients of seventh and thirteenth terms respectively in the expansion of $(\frac{1}{3}x^{\frac{1}{3}}+\frac{1}{2x^{\frac{2}{3}}})^{18}$. Then $(\frac{n}{m})^{\frac{1}{3}}$ is</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_8_answer" value="A"> (A) $\frac{4}{9}$</label></li><li><label><input type="radio" name="q_8_answer" value="B"> (B) $\frac{1}{9}$</label></li><li><label><input type="radio" name="q_8_answer" value="C"> (C) $\frac{1}{4}$</label></li><li><label><input type="radio" name="q_8_answer" value="D"> (D) $\frac{9}{4}$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q9 -->
+                <div class="question-page" id="q_9">
+                    <div class="question-header-row"><span class="q-label">Question 9</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If ${}^{2n}C_{3}: {}^{n}C_{3}=10:1$ then the ratio $(n^{2}+3n):(n^{2}-3n+4)$ is</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_9_answer" value="A"> (A) 35:16</label></li><li><label><input type="radio" name="q_9_answer" value="B"> (B) 65:37</label></li><li><label><input type="radio" name="q_9_answer" value="C"> (C) 27:11</label></li><li><label><input type="radio" name="q_9_answer" value="D"> (D) 2: 1</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q10 -->
+                <div class="question-page" id="q_10">
+                    <div class="question-header-row"><span class="q-label">Question 10</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Let $x=(8\sqrt{3}+13)^{13}$ and $y=(7\sqrt{2}+9)^{9}.$ If $[t]$ denotes the greatest integer $\le t$, then</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_10_answer" value="A"> (A) $[x]+[y]$ is even</label></li><li><label><input type="radio" name="q_10_answer" value="B"> (B) $[x]$ is odd but $[y]$ is even</label></li><li><label><input type="radio" name="q_10_answer" value="C"> (C) $[x]$ is even but $[y]$ is odd</label></li><li><label><input type="radio" name="q_10_answer" value="D"> (D) $[x]$ and $[y]$ are both odd</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q11 -->
+                <div class="question-page" id="q_11">
+                    <div class="question-header-row"><span class="q-label">Question 11</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If the coefficient of $x^{15}$ in the expansion of $(ax^{3}+\frac{1}{bx^{\frac{1}{3}}})^{15}$ is equal to the coefficient of $x^{-15}$ in the expansion of $(ax^{\frac{1}{3}}-\frac{1}{bx^{3}})^{15},$ where $a$ and $b$ are positive real numbers, then for each such ordered pair $(a, b):$</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_11_answer" value="A"> (A) $a=b$</label></li><li><label><input type="radio" name="q_11_answer" value="B"> (B) $ab=1$</label></li><li><label><input type="radio" name="q_11_answer" value="C"> (C) $a=3b$</label></li><li><label><input type="radio" name="q_11_answer" value="D"> (D) $ab=3$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q12 -->
+                <div class="question-page" id="q_12">
+                    <div class="question-header-row"><span class="q-label">Question 12</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If $n\ge2$ is a positive integer, then the sum of the series ${}^{n+1}C_{2}+2({}^{2}C_{2}+{}^{3}C_{2}+{}^{4}C_{2}+\cdots+{}^{n}C_{2})$ is:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_12_answer" value="A"> (A) $\frac{n(n+1)^{2}(n+2)}{12}$</label></li><li><label><input type="radio" name="q_12_answer" value="B"> (B) $\frac{n(n+1)(2n+1)}{6}$</label></li><li><label><input type="radio" name="q_12_answer" value="C"> (C) $\frac{n(n-1)(2n+1)}{6}$</label></li><li><label><input type="radio" name="q_12_answer" value="D"> (D) $\frac{n(2n+1)(3n+1)}{6}$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q13 -->
+                <div class="question-page" id="q_13">
+                    <div class="question-header-row"><span class="q-label">Question 13</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">${}^{n-1}C_{r}=(k^{2}-8){}^{n}C_{r+1}$ if and only if:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_13_answer" value="A"> (A) $2\sqrt{2}&lt;k\le3$</label></li><li><label><input type="radio" name="q_13_answer" value="B"> (B) $2\sqrt{3}&lt;k\le3\sqrt{2}$</label></li><li><label><input type="radio" name="q_13_answer" value="C"> (C) $2\sqrt{3}&lt;k&lt;3\sqrt{3}$</label></li><li><label><input type="radio" name="q_13_answer" value="D"> (D) $2\sqrt{2}&lt;k&lt;2\sqrt{3}$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q14 -->
+                <div class="question-page" id="q_14">
+                    <div class="question-header-row"><span class="q-label">Question 14</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If $A$ denotes the sum of all the coefficients in the expansion of $(1-3x+10x^{2})^{n}$ and $B$ denotes the sum of all the coefficients in the expansion of $(1+x^{2})^{n}$ then:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_14_answer" value="A"> (A) $A=B^{3}$</label></li><li><label><input type="radio" name="q_14_answer" value="B"> (B) $3A=B$</label></li><li><label><input type="radio" name="q_14_answer" value="C"> (C) $B=A^{3}$</label></li><li><label><input type="radio" name="q_14_answer" value="D"> (D) $A=3B$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q15 -->
+                <div class="question-page" id="q_15">
+                    <div class="question-header-row"><span class="q-label">Question 15</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">The total number of irrational terms in the binomial expansion of $(7^{1/5}-3^{1/10})^{60}$ is:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_15_answer" value="A"> (A) 55</label></li><li><label><input type="radio" name="q_15_answer" value="B"> (B) 49</label></li><li><label><input type="radio" name="q_15_answer" value="C"> (C) 48</label></li><li><label><input type="radio" name="q_15_answer" value="D"> (D) 54</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q16 -->
+                <div class="question-page" id="q_16">
+                    <div class="question-header-row"><span class="q-label">Question 16</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If ${}^{20}C_{1}+(2^{2}){}^{20}C_{2}+(3^{2}){}^{20}C_{3}+\cdots+(20^{2}){}^{20}C_{20}=A(2^{\beta}),$ then the ordered pair $(A, \beta)$ is equal to:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_16_answer" value="A"> (A) (420, 18)</label></li><li><label><input type="radio" name="q_16_answer" value="B"> (B) (380, 18)</label></li><li><label><input type="radio" name="q_16_answer" value="C"> (C) (420, 19)</label></li><li><label><input type="radio" name="q_16_answer" value="D"> (D) (380, 19)</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q17 -->
+                <div class="question-page" id="q_17">
+                    <div class="question-header-row"><span class="q-label">Question 17</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">A ratio of the $5^{th}$ term from the beginning to the $5^{th}$ term from the end in the binomial expansion of $(2^{\frac{1}{3}}+\frac{1}{2(3)^{\frac{1}{3}}})^{10}$ is:</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_17_answer" value="A"> (A) $1:2(6)^{\frac{1}{3}}$</label></li><li><label><input type="radio" name="q_17_answer" value="B"> (B) $1:4(16)^{\frac{1}{3}}$</label></li><li><label><input type="radio" name="q_17_answer" value="C"> (C) $4(36)^{\frac{1}{3}}: 1$</label></li><li><label><input type="radio" name="q_17_answer" value="D"> (D) $2(36)^{\frac{1}{3}}:1$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q18 -->
+                <div class="question-page" id="q_18">
+                    <div class="question-header-row"><span class="q-label">Question 18</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Fractional part of the number $\frac{4^{2022}}{15}$ is equal to</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_18_answer" value="A"> (A) $\frac{4}{15}$</label></li><li><label><input type="radio" name="q_18_answer" value="B"> (B) $\frac{1}{15}$</label></li><li><label><input type="radio" name="q_18_answer" value="C"> (C) $\frac{14}{15}$</label></li><li><label><input type="radio" name="q_18_answer" value="D"> (D) $\frac{8}{15}$</label></li>
+                    </ul>
+                </div>
+
+                <!-- Q19 -->
+                <div class="question-page" id="q_19">
+                    <div class="question-header-row"><span class="q-label">Question 19</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If the coefficients of $x$ and $x^{2}$ in $(1+x)^{p}(1-x)^{q}$ are $4$ and $-5$ respectively, then $2p+3q$ is equal to</div>
+                    <ul class="options-list">
+                        <li><label><input type="radio" name="q_19_answer" value="A"> (A) 63</label></li><li><label><input type="radio" name="q_19_answer" value="B"> (B) 69</label></li><li><label><input type="radio" name="q_19_answer" value="C"> (C) 66</label></li><li><label><input type="radio" name="q_19_answer" value="D"> (D) 60</label></li>
+                    </ul>
+                </div>
+
+                <!-- Numerical -->
+                <!-- Q20 -->
+                <div class="question-page" id="q_20">
+                    <div class="question-header-row"><span class="q-label">Question 20</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If the constant term in the binomial expansion of $(\frac{x^{2}}{2}-\frac{4}{x^{l}})^{9}$ is $-84$ and the Coefficient of $x^{-3l}$ is $2^{\alpha}\beta,$ where $\beta&lt;0$ is an odd number, Then $|\alpha l-\beta|$ is equal to</div>
+                    <div style="margin-top:20px"><input type="number" name="q_20_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Q21 -->
+                <div class="question-page" id="q_21">
+                    <div class="question-header-row"><span class="q-label">Question 21</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Find the value $\frac{18^{3} + 7^{3} + 3\cdot18\cdot7\cdot25}{3^{5} + 6\cdot243\cdot2 + 15\cdot81\cdot4 + 15\cdot9\cdot16 + 6\cdot3\cdot32 + 64}$</div>
+                    <div style="margin-top:20px"><input type="number" name="q_21_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Q22 -->
+                <div class="question-page" id="q_22">
+                    <div class="question-header-row"><span class="q-label">Question 22</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Number of integral terms in the expansion of $\{7^{(1/2)}+11^{(1/6)}\}^{824}$ is equal to</div>
+                    <div style="margin-top:20px"><input type="number" name="q_22_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Q23 -->
+                <div class="question-page" id="q_23">
+                    <div class="question-header-row"><span class="q-label">Question 23</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">The remainder when $428^{2024}$ is divided by $21$, is</div>
+                    <div style="margin-top:20px"><input type="number" name="q_23_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Q24 -->
+                <div class="question-page" id="q_24">
+                    <div class="question-header-row"><span class="q-label">Question 24</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">If $m$ and $n$ are coprime, then $m+n$ is equal to $({}^{40}C_{0})+({}^{41}C_{1})+({}^{42}C_{2})+\cdots+({}^{60}C_{20})=\frac{m}{n}{}^{60}C_{20}$</div>
+                    <div style="margin-top:20px"><input type="number" name="q_24_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Q25 -->
+                <div class="question-page" id="q_25">
+                    <div class="question-header-row"><span class="q-label">Question 25</span><label class="review-toggle"><input type="checkbox" onchange="toggleReviewCheckbox(this)"> Mark for Review</label></div>
+                    <div class="question-text">Let the sixth term in the binomial expansion of $(\sqrt{2^{\log_{2}(10-3^{x})}}+\sqrt[5]{2^{(x-2)\log_{2}3}})^{m}$ in the increasing powers of $2^{(x-2)\log_{2}3}$ be $21$. If the binomial coefficients of the second, third and fourth terms in the expansion are respectively the first, third and fifth terms of an A.P., then the sum of the squares of all possible values of $x$ is</div>
+                    <div style="margin-top:20px"><input type="number" name="q_25_answer" placeholder="Enter number..."></div>
+                </div>
+
+                <!-- Control Bar -->
+                <div class="navigation-controls">
+                    <button class="nav-btn save-next-btn" onclick="saveAndNext()">SAVE & NEXT</button>
+                    <button class="nav-btn mark-review-btn" onclick="markForReview()">MARK FOR REVIEW</button>
+                    <button class="nav-btn clear-btn" onclick="clearResponse()">CLEAR RESPONSE</button>
+                    <button class="nav-btn next-btn" onclick="moveToQuestion(currentQuestionIndex + 1)">NEXT >></button>
+                </div>
+            </div>
+
+            <!-- Right: Palette Area -->
+            <div class="palette-panel">
+                <div class="palette-container">
+                    <div style="margin-bottom:10px; font-weight:bold; color:#1a237e;">Question Palette</div>
+                    <div class="palette-grid" id="palette-grid"></div>
+
+                    <div class="legend">
+                        <p><span style="background:#43a047;"></span> Answered</p>
+                        <p><span style="background:#fb8c00;"></span> Marked for Review</p>
+                        <p><span style="background:#e53935;"></span> Not Answered</p>
+                        <p><span style="background:#1e88e5;"></span> Visited</p>
+                        <p><span style="background:#bdbdbd;"></span> Not Visited</p>
+                    </div>
+                </div>
+
+                <!-- Fixed Footer in Palette -->
+                <div class="palette-footer">
+                    <button class="submit-btn" onclick="endTestAndShowAnswers()">SUBMIT TEST</button>
+                    
+                    <!-- PREMIUM CREATOR BADGE -->
+                    <div class="premium-badge">
+                        <div class="premium-text">Made by Vivek</div>
+                        <div class="premium-sub">Tg id @Ruhvaan</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Key Container -->
+        <div class="answer-key-container" id="answer-key-container">
+            
+            <!-- Score Card Section -->
+            <div class="score-card">
+                <div class="score-title">TEST RESULTS</div>
+                <div class="score-grid">
+                    <div class="score-item">
+                        <div class="score-val score-total" id="total-score">0</div>
+                        <div class="score-lbl">Total Score</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-val score-correct" id="total-correct">0</div>
+                        <div class="score-lbl">Correct</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-val score-wrong" id="total-wrong">0</div>
+                        <div class="score-lbl">Wrong</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-val" id="total-unattempted">0</div>
+                        <div class="score-lbl">Unattempted</div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 style="text-align:center; margin-bottom:30px; color:#1a237e;">Detailed Solutions</h2>
+            <!-- Answers -->
+            <div class="ans-card"><div class="q-label">Q1</div><div class="ans-correct">Answer: (B) 1</div><div class="ans-reason">Rational: $64 \equiv 1 \pmod 7$.</div><div class="user-ans-display" id="disp_q1"></div></div>
+            <div class="ans-card"><div class="q-label">Q2</div><div class="ans-correct">Answer: (C) $\frac{n}{2}a_n$</div><div class="ans-reason">Symmetry of Binomial Coefficients.</div><div class="user-ans-display" id="disp_q2"></div></div>
+            <div class="ans-card"><div class="q-label">Q3</div><div class="ans-correct">Answer: (C) 1113</div><div class="ans-reason">Multinomial theorem expansion.</div><div class="user-ans-display" id="disp_q3"></div></div>
+            <div class="ans-card"><div class="q-label">Q4</div><div class="ans-correct">Answer: (A) 612</div><div class="ans-reason">Rational terms require integer powers.</div><div class="user-ans-display" id="disp_q4"></div></div>
+            <div class="ans-card"><div class="q-label">Q5</div><div class="ans-correct">Answer: (B) 465</div><div class="ans-reason">Summation formula simplification.</div><div class="user-ans-display" id="disp_q5"></div></div>
+            <div class="ans-card"><div class="q-label">Q6</div><div class="ans-correct">Answer: (B) 01</div><div class="ans-reason">Modular arithmetic $\pmod{100}$.</div><div class="user-ans-display" id="disp_q6"></div></div>
+            <div class="ans-card"><div class="q-label">Q7</div><div class="ans-correct">Answer: (B) Negative number</div><div class="ans-reason">Conjugate properties.</div><div class="user-ans-display" id="disp_q7"></div></div>
+            <div class="ans-card"><div class="q-label">Q8</div><div class="ans-correct">Answer: (D) $9/4$</div><div class="ans-reason">General term coefficient comparison.</div><div class="user-ans-display" id="disp_q8"></div></div>
+            <div class="ans-card"><div class="q-label">Q9</div><div class="ans-correct">Answer: (D) 2:1</div><div class="ans-reason">$n=8$ substitution.</div><div class="user-ans-display" id="disp_q9"></div></div>
+            <div class="ans-card"><div class="q-label">Q10</div><div class="ans-correct">Answer: (A) Sum is even</div><div class="ans-reason">Property of integer parts.</div><div class="user-ans-display" id="disp_q10"></div></div>
+            <div class="ans-card"><div class="q-label">Q11</div><div class="ans-correct">Answer: (B) $ab=1$</div><div class="ans-reason">Binomial coefficient symmetry.</div><div class="user-ans-display" id="disp_q11"></div></div>
+            <div class="ans-card"><div class="q-label">Q12</div><div class="ans-correct">Answer: (B) Formula</div><div class="ans-reason">Identity summation.</div><div class="user-ans-display" id="disp_q12"></div></div>
+            <div class="ans-card"><div class="q-label">Q13</div><div class="ans-correct">Answer: (A) Range of k</div><div class="ans-reason">Inequality solution.</div><div class="user-ans-display" id="disp_q13"></div></div>
+            <div class="ans-card"><div class="q-label">Q14</div><div class="ans-correct">Answer: (A) $A=B^3$</div><div class="ans-reason">Value at x=1.</div><div class="user-ans-display" id="disp_q14"></div></div>
+            <div class="ans-card"><div class="q-label">Q15</div><div class="ans-correct">Answer: (D) 54</div><div class="ans-reason">Total terms minus rational terms.</div><div class="user-ans-display" id="disp_q15"></div></div>
+            <div class="ans-card"><div class="q-label">Q16</div><div class="ans-correct">Answer: (A) (420, 18)</div><div class="ans-reason">Differentiation of binomial expansion.</div><div class="user-ans-display" id="disp_q16"></div></div>
+            <div class="ans-card"><div class="q-label">Q17</div><div class="ans-correct">Answer: (C) Ratio</div><div class="ans-reason">Term formula.</div><div class="user-ans-display" id="disp_q17"></div></div>
+            <div class="ans-card"><div class="q-label">Q18</div><div class="ans-correct">Answer: (B) 1/15</div><div class="ans-reason">Modular arithmetic.</div><div class="user-ans-display" id="disp_q18"></div></div>
+            <div class="ans-card"><div class="q-label">Q19</div><div class="ans-correct">Answer: (A) 63</div><div class="ans-reason">Coefficient comparison.</div><div class="user-ans-display" id="disp_q19"></div></div>
+            <div class="ans-card"><div class="q-label">Q20</div><div class="ans-correct">Answer: 98</div><div class="user-ans-display" id="disp_q20"></div></div>
+            <div class="ans-card"><div class="q-label">Q21</div><div class="ans-correct">Answer: 1</div><div class="user-ans-display" id="disp_q21"></div></div>
+            <div class="ans-card"><div class="q-label">Q22</div><div class="ans-correct">Answer: 138</div><div class="user-ans-display" id="disp_q22"></div></div>
+            <div class="ans-card"><div class="q-label">Q23</div><div class="ans-correct">Answer: 1</div><div class="user-ans-display" id="disp_q23"></div></div>
+            <div class="ans-card"><div class="q-label">Q24</div><div class="ans-correct">Answer: 102</div><div class="user-ans-display" id="disp_q24"></div></div>
+            <div class="ans-card"><div class="q-label">Q25</div><div class="ans-correct">Answer: 4</div><div class="user-ans-display" id="disp_q25"></div></div>
+        </div>
+    </div>
+
+    <script>
+        const TOTAL_QUESTIONS = 25;
+        // Correct Answer Key
+        const CORRECT_ANSWERS = {
+            1: "B", 2: "C", 3: "C", 4: "A", 5: "B",
+            6: "B", 7: "B", 8: "D", 9: "D", 10: "A",
+            11: "B", 12: "B", 13: "A", 14: "A", 15: "D",
+            16: "A", 17: "C", 18: "B", 19: "A",
+            20: "98", 21: "1", 22: "138", 23: "1", 24: "102", 25: "4"
+        };
+
+        let currentQuestionIndex = 1;
+        let questionStatus = new Array(TOTAL_QUESTIONS + 1).fill(4); // 4 = Not Visited
+        let answers = {};
+        let markedForReview = new Array(TOTAL_QUESTIONS + 1).fill(false);
+        
+        let time = 45 * 60;
+        const countdownEl = document.getElementById('timer');
+        let timerInterval;
+
+        // --- PASSWORD FUNCTION ---
+        function checkPassword() {
+            const pass = document.getElementById('exam-password').value;
+            const inputField = document.getElementById('exam-password');
+            if(pass === "Ruhvaan") {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('test-interface').style.display = 'block';
+                startExam();
+            } else {
+                inputField.classList.add('error');
+                inputField.value = '';
+                inputField.placeholder = "Access Denied!";
+                setTimeout(() => {
+                    inputField.classList.remove('error');
+                    inputField.placeholder = "Enter Password";
+                }, 1000);
+            }
+        }
+
+        // INIT
+        function startExam() {
+            startTimer();
+            createPalette();
+            questionStatus[1] = 3; // Visited
+            showQuestion(1);
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                const min = Math.floor(time / 60);
+                const sec = time % 60;
+                countdownEl.innerHTML = `${min}:${sec < 10 ? '0'+sec : sec}`;
+                if (time <= 0) { clearInterval(timerInterval); endTestAndShowAnswers(true); }
+                time--;
+            }, 1000);
+        }
+
+        // NAV Logic
+        function showQuestion(idx) {
+            document.querySelectorAll('.question-page').forEach(el => el.style.display = 'none');
+            const target = document.getElementById(`q_${idx}`);
+            if (target) {
+                target.style.display = 'block';
+                currentQuestionIndex = idx;
+                
+                // Update Visited Status if not answered/marked
+                if (questionStatus[idx] === 4) {
+                    questionStatus[idx] = 3;
+                }
+                
+                updateCheckbox(idx);
+                updatePalette();
+            }
+        }
+
+        // Checkbox Logic
+        function toggleReviewCheckbox(cb) {
+            markedForReview[currentQuestionIndex] = cb.checked;
+            updateStatus(currentQuestionIndex);
+            updatePalette();
+        }
+
+        function updateCheckbox(idx) {
+            const cb = document.querySelector(`#q_${idx} .review-toggle input`);
+            if(cb) cb.checked = markedForReview[idx];
+        }
+
+        function updateStatus(idx) {
+            const ans = getAnswer(idx);
+            if (markedForReview[idx]) {
+                questionStatus[idx] = 2; // Marked
+            } else if (ans) {
+                questionStatus[idx] = 1; // Answered
+            } else {
+                questionStatus[idx] = 3; // Visited/Not Answered
+            }
+        }
+
+        function getAnswer(idx) {
+            const name = `q_${idx}_answer`;
+            const radio = document.querySelector(`input[name="${name}"]:checked`);
+            const num = document.querySelector(`input[name="${name}"][type="number"]`);
+            if (radio) return radio.value;
+            if (num && num.value.trim() !== '') return num.value.trim();
+            return null;
+        }
+
+        function saveAndNext() {
+            const ans = getAnswer(currentQuestionIndex);
+            if (ans) {
+                answers[`q_${currentQuestionIndex}_answer`] = ans;
+                if(!markedForReview[currentQuestionIndex]) questionStatus[currentQuestionIndex] = 1;
+            } else if (!markedForReview[currentQuestionIndex]) {
+                questionStatus[currentQuestionIndex] = 0; // Red if skipped
+            }
+            moveToQuestion(currentQuestionIndex + 1);
+        }
+
+        function markForReview() {
+            markedForReview[currentQuestionIndex] = true;
+            // Also save answer if present
+            const ans = getAnswer(currentQuestionIndex);
+            if(ans) answers[`q_${currentQuestionIndex}_answer`] = ans;
+            
+            questionStatus[currentQuestionIndex] = 2;
+            updateCheckbox(currentQuestionIndex);
+            moveToQuestion(currentQuestionIndex + 1);
+        }
+
+        function clearResponse() {
+            const name = `q_${currentQuestionIndex}_answer`;
+            document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+                if(el.type==='radio') el.checked = false;
+                if(el.type==='number') el.value = '';
+            });
+            delete answers[name];
+            markedForReview[currentQuestionIndex] = false;
+            updateCheckbox(currentQuestionIndex);
+            questionStatus[currentQuestionIndex] = 3;
+            updatePalette();
+        }
+
+        function moveToQuestion(idx) {
+            if (idx > TOTAL_QUESTIONS) idx = 1;
+            else if (idx < 1) idx = TOTAL_QUESTIONS;
+            showQuestion(idx);
+        }
+
+        // Palette
+        function createPalette() {
+            const grid = document.getElementById('palette-grid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+                const div = document.createElement('div');
+                div.className = `q-status status-${questionStatus[i]}`;
+                div.id = `pal_${i}`;
+                div.textContent = i;
+                div.onclick = () => showQuestion(i);
+                grid.appendChild(div);
+            }
+        }
+
+        function updatePalette() {
+            for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+                const div = document.getElementById(`pal_${i}`);
+                if(div) div.className = `q-status status-${questionStatus[i]}`;
+            }
+        }
+
+        function calculateScore() {
+            let correct = 0;
+            let wrong = 0;
+            let unattempted = 0;
+            let score = 0;
+
+            for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+                const userAns = answers[`q_${i}_answer`];
+                const displayEl = document.getElementById(`disp_q${i}`);
+                
+                if (!userAns) {
+                    unattempted++;
+                    if(displayEl) displayEl.innerHTML = `<span style="color:grey">You did not attempt this question.</span>`;
+                } else {
+                    // Compare Answer (Case insensitive and trim)
+                    if (userAns.trim().toUpperCase() === CORRECT_ANSWERS[i].toUpperCase()) {
+                        correct++;
+                        score += 4; // +4 for correct
+                        if(displayEl) displayEl.innerHTML = `<span style="color:green">Your Answer: ${userAns} (Correct)</span>`;
+                    } else {
+                        wrong++;
+                        score -= 1; // -1 for wrong
+                        if(displayEl) displayEl.innerHTML = `<span style="color:red">Your Answer: ${userAns} (Incorrect)</span>`;
+                    }
+                }
+            }
+
+            // Update Score Card
+            document.getElementById('total-score').innerText = score;
+            document.getElementById('total-correct').innerText = correct;
+            document.getElementById('total-wrong').innerText = wrong;
+            document.getElementById('total-unattempted').innerText = unattempted;
+        }
+
+        function endTestAndShowAnswers(force=false) {
+            if(!force && !confirm("Are you sure you want to Submit the Test?")) return;
+            clearInterval(timerInterval);
+            
+            calculateScore();
+
+            document.querySelector('.question-panel').style.display = 'none';
+            document.querySelector('.palette-panel').style.display = 'none';
+            document.querySelector('.header-bar').style.display = 'none';
+            document.getElementById('answer-key-container').style.display = 'block';
+            
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
